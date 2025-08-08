@@ -30,7 +30,7 @@ export const clientsApi = {
     await api.delete(`/clients/${id}`);
   },
 
-  getStatus: async (id: string): Promise<{ status: string; metrics?: any }> => {
+  getStatus: async (id: string): Promise<{ status: string; metrics?: Record<string, unknown> }> => {
     const response = await api.get(`/clients/${id}/status`);
     return response.data;
   },
