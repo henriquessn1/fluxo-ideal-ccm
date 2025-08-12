@@ -18,8 +18,25 @@ O frontend envia tokens JWT (JSON Web Tokens) nas requisições HTTP que devem s
 KEYCLOAK_URL=https://auth.fluxoideal.com
 KEYCLOAK_REALM=client-monitor
 KEYCLOAK_CLIENT_ID=dashboard-spa
-KEYCLOAK_CLIENT_SECRET=your-client-secret (apenas se confidential client)
+KEYCLOAK_CLIENT_SECRET=your-client-secret  # ⚠️ OPCIONAL - veja explicação abaixo
 ```
+
+### ⚠️ Sobre o CLIENT_SECRET
+
+O `KEYCLOAK_CLIENT_SECRET` é **OPCIONAL** porque existem duas formas de validar tokens:
+
+1. **Validação JWT/JWKS (Recomendada)**: 
+   - ✅ Não precisa de `CLIENT_SECRET`
+   - ✅ Usa chaves públicas do Keycloak (`/certs` endpoint)
+   - ✅ Mais rápida e segura
+   - ✅ Funciona offline
+
+2. **Token Introspection**:
+   - ⚠️ Precisa de `CLIENT_SECRET`
+   - ⚠️ Chama o Keycloak a cada validação
+   - ⚠️ Mais lenta, mas verifica revogação em tempo real
+
+**Para aplicações SPA (Single Page Application)**, recomendamos a validação JWT/JWKS que não requer secret.
 
 ### URLs Importantes
 
@@ -72,6 +89,61 @@ KEYCLOAK_CLIENT_SECRET=your-client-secret (apenas se confidential client)
   }
 }
 ```
+
+## Métodos de Validação - Comparação Detalhada
+
+### 🏆 Método 1: Validação JWT com JWKS (Recomendado)
+
+**Como funciona:**
+```
+1. Keycloak assina o token com sua chave privada (RSA)
+2. Backend busca a chave pública do Keycloak (endpoint /certs)
+3. Backend valida a assinatura usando a chave pública
+4. Se a assinatura for válida = token é autêntico
+```
+
+**Prós:**
+- ✅ **Performance**: Não precisa chamar Keycloak a cada validação
+- ✅ **Segurança**: Chaves públicas podem ser expostas sem risco
+- ✅ **Confiabilidade**: Funciona mesmo se Keycloak estiver indisponível
+- ✅ **Padrão**: É como JWT foi projetado para funcionar
+- ✅ **Não precisa de SECRET**: Cliente público (SPA)
+
+**Contras:**
+- ❌ **Não detecta revogação**: Se token for revogado, ainda será válido até expirar
+- ❌ **Cache de chaves**: Precisa gerenciar cache das chaves públicas
+
+### 🔍 Método 2: Token Introspection
+
+**Como funciona:**
+```
+1. Backend envia token para Keycloak via POST /introspect
+2. Keycloak verifica internamente se token é válido/ativo
+3. Keycloak retorna status + metadados do token
+4. Backend usa a resposta para decidir se aceita ou rejeita
+```
+
+**Prós:**
+- ✅ **Revogação em tempo real**: Detecta tokens revogados
+- ✅ **Metadados extras**: Informações adicionais sobre o token
+- ✅ **Validação centralizada**: Keycloak é fonte da verdade
+
+**Contras:**
+- ❌ **Performance**: Chamada HTTP a cada validação
+- ❌ **Dependência**: Se Keycloak cair, validação para
+- ❌ **Precisa de SECRET**: Para autenticar a requisição de introspection
+
+### 🎯 Recomendação
+
+**Use JWT/JWKS para:**
+- APIs com alto volume de requisições
+- Aplicações que precisam funcionar offline
+- Clientes públicos (SPAs, apps mobile)
+
+**Use Introspection para:**
+- Operações críticas que precisam verificar revogação
+- Como validação adicional em endpoints sensíveis
+- Quando precisa de metadados extras do token
 
 ## Implementação da Validação
 
